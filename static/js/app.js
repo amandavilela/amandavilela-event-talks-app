@@ -16,9 +16,7 @@ const CIRCUMFERENCE = 2 * Math.PI * 10; // 62.8318
 
 // DOM elements
 const elements = {
-    themeToggleBtn: document.getElementById('themeToggleBtn'),
-    sunIcon: document.getElementById('sunIcon'),
-    moonIcon: document.getElementById('moonIcon'),
+    themeCheckbox: document.getElementById('themeCheckbox'),
     refreshBtn: document.getElementById('refreshBtn'),
     refreshIcon: document.getElementById('refreshIcon'),
     exportCsvBtn: document.getElementById('exportCsvBtn'),
@@ -57,31 +55,25 @@ function initTheme() {
     const savedTheme = localStorage.getItem('theme');
     const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     
-    if (savedTheme === 'dark' || (!savedTheme && systemPrefersDark)) {
-        setTheme(true);
-    } else {
-        setTheme(false);
-    }
+    const isDark = (savedTheme === 'dark' || (!savedTheme && systemPrefersDark));
+    setTheme(isDark);
 }
 
 function setTheme(dark) {
     appState.isDarkMode = dark;
+    elements.themeCheckbox.checked = dark;
     if (dark) {
         document.body.classList.add('dark-mode');
-        elements.sunIcon.classList.remove('hidden');
-        elements.moonIcon.classList.add('hidden');
         localStorage.setItem('theme', 'dark');
     } else {
         document.body.classList.remove('dark-mode');
-        elements.sunIcon.classList.add('hidden');
-        elements.moonIcon.classList.remove('hidden');
         localStorage.setItem('theme', 'light');
     }
 }
 
 function setupEventListeners() {
-    // Theme toggle click
-    elements.themeToggleBtn.addEventListener('click', () => setTheme(!appState.isDarkMode));
+    // Theme toggle switch change
+    elements.themeCheckbox.addEventListener('change', (e) => setTheme(e.target.checked));
     
     // Refresh button click
     elements.refreshBtn.addEventListener('click', () => fetchReleases(true));
