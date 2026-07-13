@@ -456,7 +456,13 @@ body {
 .category-pill.fixed { color: var(--fixed-color); background-color: var(--fixed-bg); }
 .category-pill.general { color: var(--general-color); background-color: var(--general-bg); }
 
-/* Tweet Action Button inside Sub-Update card */
+/* Tweet & Copy Action Buttons inside Sub-Update card */
+.sub-update-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
 .btn-share-tweet {
     background-color: transparent;
     color: var(--text-secondary);
@@ -483,6 +489,20 @@ body.dark-mode .btn-share-tweet:hover {
     color: #38bdf8;
     border-color: #38bdf8;
     background-color: rgba(56, 189, 248, 0.08);
+}
+
+/* Copy Button custom states */
+.btn-copy-text:hover {
+    color: var(--feature-color) !important;
+    border-color: var(--feature-color) !important;
+    background-color: var(--feature-bg) !important;
+}
+
+.btn-copy-text.copied {
+    color: var(--feature-color) !important;
+    border-color: var(--feature-color) !important;
+    background-color: var(--feature-bg) !important;
+    box-shadow: 0 0 8px var(--feature-bg);
 }
 
 /* Content Markup styles (from HTML injection) */

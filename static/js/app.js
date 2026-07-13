@@ -21,6 +21,7 @@ const elements = {
     moonIcon: document.getElementById('moonIcon'),
     refreshBtn: document.getElementById('refreshBtn'),
     refreshIcon: document.getElementById('refreshIcon'),
+    exportCsvBtn: document.getElementById('exportCsvBtn'),
     lastUpdated: document.getElementById('lastUpdated'),
     searchInput: document.getElementById('searchInput'),
     clearSearchBtn: document.getElementById('clearSearchBtn'),
@@ -85,6 +86,9 @@ function setupEventListeners() {
     // Refresh button click
     elements.refreshBtn.addEventListener('click', () => fetchReleases(true));
     elements.retryBtn.addEventListener('click', () => fetchReleases(true));
+    
+    // Export CSV click
+    elements.exportCsvBtn.addEventListener('click', exportToCsv);
     
     // Search inputs
     elements.searchInput.addEventListener('input', debounce((e) => {
@@ -353,6 +357,42 @@ function renderNotes() {
             categoryPill.className = `category-pill ${sub.category.toLowerCase()}`;
             categoryPill.textContent = sub.category;
             
+            // Action button container
+            const actionsDiv = document.createElement('div');
+            actionsDiv.className = 'sub-update-actions';
+            
+            // Copy to Clipboard Button
+            const copyBtn = document.createElement('button');
+            copyBtn.className = 'btn-share-tweet btn-copy-text';
+            copyBtn.title = 'Copy update to clipboard';
+            copyBtn.ariaLabel = `Copy ${sub.category} update text from ${entry.title}`;
+            copyBtn.innerHTML = `
+                <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+                <span>Copy</span>
+            `;
+            
+            copyBtn.addEventListener('click', () => {
+                const cleanText = stripHtml(sub.content).trim().replace(/\s+/g, ' ');
+                const textToCopy = `BigQuery Release Note (${entry.title}) - [${sub.category}]:\n${cleanText}\n\nRead more: ${entry.link}`;
+                
+                navigator.clipboard.writeText(textToCopy).then(() => {
+                    const span = copyBtn.querySelector('span');
+                    const origText = span.textContent;
+                    span.textContent = 'Copied!';
+                    copyBtn.classList.add('copied');
+                    setTimeout(() => {
+                        span.textContent = origText;
+                        copyBtn.classList.remove('copied');
+                    }, 1500);
+                }).catch(err => {
+                    console.error('Could not copy text: ', err);
+                });
+            });
+
+            // Tweet Update Button
             const tweetBtn = document.createElement('button');
             tweetBtn.className = 'btn-share-tweet';
             tweetBtn.title = 'Compose a tweet about this update';
@@ -369,8 +409,11 @@ function renderNotes() {
                 openTweetComposer(entry.title, sub.category, sub.content, entry.link);
             });
             
+            actionsDiv.appendChild(copyBtn);
+            actionsDiv.appendChild(tweetBtn);
+            
             itemHeader.appendChild(categoryPill);
-            itemHeader.appendChild(tweetBtn);
+            itemHeader.appendChild(actionsDiv);
             item.appendChild(itemHeader);
             
             // Content HTML
@@ -510,4 +553,47 @@ function publishTweet() {
     window.open(shareUrl, '_blank', 'noopener,noreferrer');
     
     closeTweetModal();
+}
+
+// Export the filtered release notes to a CSV file
+function exportToCsv() {
+    if (appState.filteredReleases.length === 0) {
+        alert("No release notes found to export.");
+        return;
+    }
+    
+    const csvRows = [];
+    // CSV headers
+    csvRows.push(['Date', 'Category', 'URL', 'Description']);
+    
+    appState.filteredReleases.forEach(entry => {
+        entry.sub_updates.forEach(sub => {
+            const cleanText = stripHtml(sub.content).trim().replace(/\s+/g, ' ');
+            
+            // Escape double quotes by doubling them up as per CSV specifications
+            const escapedDate = `"${entry.title.replace(/"/g, '""')}"`;
+            const escapedCategory = `"${sub.category.replace(/"/g, '""')}"`;
+            const escapedUrl = `"${entry.link.replace(/"/g, '""')}"`;
+            const escapedDesc = `"${cleanText.replace(/"/g, '""')}"`;
+            
+            csvRows.push([escapedDate, escapedCategory, escapedUrl, escapedDesc]);
+        });
+    });
+    
+    // Combine array with CRLF line termination
+    const csvContent = csvRows.map(row => row.join(',')).join('\r\n');
+    
+    // Generate blob and trigger click download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    
+    // Generate dynamic filename containing current ISO date
+    const dateString = new Date().toISOString().slice(0, 10);
+    link.setAttribute("download", `bigquery_release_notes_export_${dateString}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 }
