@@ -20,6 +20,7 @@ const elements = {
     refreshBtn: document.getElementById('refreshBtn'),
     refreshIcon: document.getElementById('refreshIcon'),
     exportCsvBtn: document.getElementById('exportCsvBtn'),
+    searchSummary: document.getElementById('searchSummary'),
     lastUpdated: document.getElementById('lastUpdated'),
     searchInput: document.getElementById('searchInput'),
     clearSearchBtn: document.getElementById('clearSearchBtn'),
@@ -129,6 +130,12 @@ function setupEventListeners() {
     elements.closeModalBtn.addEventListener('click', closeTweetModal);
     elements.cancelTweetBtn.addEventListener('click', closeTweetModal);
     elements.tweetTextarea.addEventListener('input', updateTweetComposerStatus);
+    elements.tweetTextarea.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+            e.preventDefault();
+            publishTweet();
+        }
+    });
     elements.submitTweetBtn.addEventListener('click', publishTweet);
     
     // Close modal on background click
@@ -247,6 +254,7 @@ function filterAndRender() {
     const cat = appState.selectedCategory;
     
     const filtered = [];
+    let totalCount = 0;
     
     appState.releases.forEach(entry => {
         const matchingSubUpdates = entry.sub_updates.filter(sub => {
@@ -268,10 +276,12 @@ function filterAndRender() {
                 ...entry,
                 sub_updates: matchingSubUpdates
             });
+            totalCount += matchingSubUpdates.length;
         }
     });
     
     appState.filteredReleases = filtered;
+    updateSearchSummary(totalCount, cat, appState.searchQuery);
     renderNotes();
 }
 
@@ -280,6 +290,82 @@ function stripHtml(html) {
     const tempDiv = document.createElement('div');
     tempDiv.innerHTML = html;
     return tempDiv.innerText || tempDiv.textContent || '';
+}
+
+// Emoji mapping for category types
+const emojiMap = {
+    'all': '📋',
+    'feature': '✨',
+    'security': '🛡️',
+    'changed': '⚙️',
+    'deprecated': '⚠️',
+    'fixed': '🛠️',
+    'general': '📝'
+};
+
+function getCategoryEmoji(category) {
+    return emojiMap[category.toLowerCase()] || '📝';
+}
+
+// Escape html strings for counter display
+function escapeHtml(text) {
+    const map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    };
+    return text.replace(/[&<>"']/g, (m) => map[m]);
+}
+
+// Update the search results status text label
+function updateSearchSummary(count, category, query) {
+    if (category === 'all' && !query) {
+        elements.searchSummary.classList.add('hidden');
+        return;
+    }
+    
+    let summaryText = `Found <strong>${count}</strong> release update${count === 1 ? '' : 's'}`;
+    if (category !== 'all') {
+        summaryText += ` under <strong>${getCategoryEmoji(category)} ${category}</strong>`;
+    }
+    if (query) {
+        summaryText += ` matching "<strong>${escapeHtml(query)}</strong>"`;
+    }
+    
+    elements.searchSummary.innerHTML = summaryText;
+    elements.searchSummary.classList.remove('hidden');
+}
+
+// Safely highlight text inside DOM element without breaking HTML tags
+function highlightTextNodes(element, query) {
+    if (!query) return;
+    const regex = new RegExp(`(${escapeRegExp(query)})`, 'gi');
+    
+    const walk = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, null, false);
+    const textNodes = [];
+    let node;
+    while (node = walk.nextNode()) {
+        // Skip text node modifications if inside script or style tags to avoid bugs
+        const parentTag = node.parentNode.tagName.toLowerCase();
+        if (parentTag !== 'script' && parentTag !== 'style') {
+            textNodes.push(node);
+        }
+    }
+    
+    textNodes.forEach(node => {
+        const text = node.nodeValue;
+        if (regex.test(text)) {
+            const span = document.createElement('span');
+            span.innerHTML = text.replace(regex, '<mark class="search-highlight">$1</mark>');
+            node.parentNode.replaceChild(span, node);
+        }
+    });
+}
+
+function escapeRegExp(string) {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 // Render release notes to feed
@@ -347,7 +433,7 @@ function renderNotes() {
             
             const categoryPill = document.createElement('span');
             categoryPill.className = `category-pill ${sub.category.toLowerCase()}`;
-            categoryPill.textContent = sub.category;
+            categoryPill.textContent = `${getCategoryEmoji(sub.category)} ${sub.category}`;
             
             // Action button container
             const actionsDiv = document.createElement('div');
@@ -412,6 +498,11 @@ function renderNotes() {
             const content = document.createElement('div');
             content.className = 'sub-update-content';
             content.innerHTML = sub.content;
+            
+            // Apply text keyword highlighting
+            if (appState.searchQuery) {
+                highlightTextNodes(content, appState.searchQuery);
+            }
             
             item.appendChild(content);
             list.appendChild(item);
